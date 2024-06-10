@@ -1,3 +1,10 @@
+"""
+code extracted from 
+https://github.com/griffinbholt/decisionmaking-code-py/blob/9291865f9c9b0f2863989fc42e89eabafec86a56/src/ch07.py
+this is the python translation from the julia code present on the book "algorithms for decision making", 
+the chapter 07 presents most of the algorithms to solve MDP's. The code here is adapted for readability 
+"""
+
 """Chapter 7: Exact Solution Methods"""
 
 import cvxpy as cp
