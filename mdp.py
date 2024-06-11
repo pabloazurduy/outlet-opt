@@ -123,6 +123,19 @@ class ExactSolutionMethod(OfflinePlanningMethod):
 
 
 class PolicyIteration(ExactSolutionMethod):
+    """
+    Policy iteration (algorithm 7.6) is one way to compute an optimal policy. 
+    It involves iterating between policy evaluation (section 7.2) and policy 
+    improvement through a greedy policy (algorithm 7.5). Policy iteration is 
+    guaranteed to converge given any initial policy. It converges in a finite 
+    number of iterations because there are finitely many policies and every 
+    iteration improves the policy if it can be improved. Although the number 
+    of possible policies is exponential in the number of states, policy iteration 
+    often converges quickly.
+
+    Args:
+        ExactSolutionMethod (_type_): _description_
+    """
     def __init__(self, initial_policy: Callable[[Any], Any], k_max: int):
         self.initial_policy = initial_policy
         self.k_max = k_max
@@ -134,11 +147,20 @@ class PolicyIteration(ExactSolutionMethod):
             policy_prime = ValueFunctionPolicy(P, U)
             if all([policy(s) == policy_prime(s) for s in P.S]):
                 break
+            print([policy_prime(s) for s in P.S], f'{U = }')
             policy = policy_prime
         return policy
 
 
 class ValueIteration(ExactSolutionMethod):
+    """Bellman's algorithm
+    Value iteration is an alternative to policy iteration that is often used 
+    because of its simplicity. Unlike policy improvement, value iteration 
+    updates the value function directly. I
+
+    Args:
+        ExactSolutionMethod (_type_): _description_
+    """    
     def __init__(self, k_max: int):
         self.k_max = k_max
 
@@ -151,6 +173,18 @@ class ValueIteration(ExactSolutionMethod):
 
 
 class GaussSeidelValueIteration(ExactSolutionMethod):
+    """    In asynchronous value iteration, only a subset of the states are updated with 
+    each iteration. Asynchronous value iteration is still guaranteed to converge on 
+    the optimal value function, provided that each state is updated an infinite number of times.
+    
+    The computational savings lies in not having to construct a second value function
+    in memory with each iteration. Gauss-Seidel value iteration can converge more
+    quickly than standard value iteration, depending on the ordering chosen.1
+
+    Args:
+        ExactSolutionMethod (_type_): _description_
+    """
+
     def __init__(self, k_max: int):
         self.k_max = k_max
 
@@ -163,6 +197,9 @@ class GaussSeidelValueIteration(ExactSolutionMethod):
 
 
 class LinearProgramFormulation(ExactSolutionMethod):
+
+
+    
     def solve(self, P: MDP) -> Callable[[Any], Any]:
         S, A, R, T = self.numpyform(P)
         U = cp.Variable(len(S))

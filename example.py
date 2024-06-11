@@ -1,5 +1,5 @@
 from mdp import MDP 
-from mdp import ValueIteration 
+from mdp import ValueIteration, PolicyIteration 
 dice_game =  MDP(gamma=0.9, 
                 S=['In', 'Out'],
                 A=['stay', 'quit'],
@@ -19,7 +19,10 @@ dice_game =  MDP(gamma=0.9,
 val = dice_game.iterative_policy_evaluation(policy=lambda x:'stay', k_max=1000)
 print(val)
 
-vp = ValueIteration(k_max=10)
-policy_after_one_step = vp.solve(P=dice_game)
-print("U(s_In) =", policy_after_one_step.U[0])
-print("U(s_Out) =", policy_after_one_step.U[1])
+#vp = ValueIteration(k_max=10)
+#policy_after_one_step = vp.solve(P=dice_game)
+pi = PolicyIteration(k_max=100, initial_policy=dice_game.random_policy())
+p = pi.solve(P=dice_game)
+print([p(s) for s in dice_game.S])
+# print("U(s_In) =", policy_after_one_step.U[0])
+# print("U(s_Out) =", policy_after_one_step.U[1])
