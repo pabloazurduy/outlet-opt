@@ -25,78 +25,79 @@ class MDP():
     components of the MDP, written (S, A, T, R, gamma):
 
     gamma: discount factor
-    S: state space
-    A: action space
-    T: transition function
-    R: reward function
-    TR: sample transition and reward. We will us `TR` later to sample the next
+    states: state space
+    actions: action space
+    t_matrix: transition function
+    rewards: reward function
+    r_sample: sample transition and reward. We will us `TR` later to sample the next
         state and reward given the current state and action: s_prime, r = TR(s, a)
+        r_sample is a sample from q function
     """
     def __init__(self,
                  gamma: float, 
-                 S: list[Any],
-                 A: list[Any],
-                 T: Callable[[Any, Any, Any], float] | np.ndarray,
-                 R: Callable[[Any, Any], float] | np.ndarray,
-                 TR: Callable[[Any, Any], tuple[Any, float]] = None):
+                 states: list[Any],
+                 actions: list[Any],
+                 t_matrix: Callable[[Any, Any, Any], float] | np.ndarray,
+                 rewards: Callable[[Any, Any], float] | np.ndarray,
+                 r_sample: Callable[[Any, Any], tuple[Any, float]] = None):
         self.gamma = gamma  # discount factor
-        self.S = S          # state space
-        self.A = A          # action space
+        self.states = states          # state space
+        self.actions = actions          # action space
 
         # reward function R(s, a)
-        if type(R) == np.ndarray:
-            self.R = lambda s, a: R[s, a]
+        if type(rewards) == np.ndarray:
+            self.rewards = lambda s, a: rewards[s, a]
         else:
-            self.R = R
+            self.rewards = rewards
 
         # transition function T(s, a, s')
         # sample next state and reward given current state and action: s', r = TR(s, a)
-        if type(T) == np.ndarray:
-            self.T = lambda s, a, s_prime: T[s, a, s_prime]
-            self.TR = lambda s, a: (np.random.choice(len(self.S), p=T[s, a]), self.R(s, a)) if not np.all(T[s, a] == 0) else (np.random.choice(len(self.S)), self.R(s, a))
+        if type(t_matrix) == np.ndarray:
+            self.t_matrix = lambda s, a, s_prime: t_matrix[s, a, s_prime]
+            self.q_sample = lambda s, a: (np.random.choice(len(self.states), p=t_matrix[s, a]), self.rewards(s, a)) if not np.all(t_matrix[s, a] == 0) else (np.random.choice(len(self.states)), self.rewards(s, a))
         else:
-            self.T = T
-            self.TR = TR
+            self.t_matrix = t_matrix
+            self.q_sample = r_sample
 
     def lookahead(self, U: Callable[[Any], float] | np.ndarray, s: Any, a: Any) -> float:
         if callable(U):
-            return self.R(s, a) + self.gamma * np.sum([self.T(s, a, s_prime) * U(s_prime) for s_prime in self.S])
-        return self.R(s, a) + self.gamma * np.sum([self.T(s, a, s_prime) * U[i] for i, s_prime in enumerate(self.S)])
+            return self.rewards(s, a) + self.gamma * np.sum([self.t_matrix(s, a, s_prime) * U(s_prime) for s_prime in self.states])
+        return self.rewards(s, a) + self.gamma * np.sum([self.t_matrix(s, a, s_prime) * U[i] for i, s_prime in enumerate(self.states)])
 
     def iterative_policy_evaluation(self, policy: Callable[[Any], Any], k_max: int) -> np.ndarray:
-        U = np.zeros(len(self.S))
+        U = np.zeros(len(self.states))
         for _ in range(k_max):
-            U = np.array([self.lookahead(U, s, policy(s)) for s in self.S])
+            U = np.array([self.lookahead(U, s, policy(s)) for s in self.states])
         return U
 
     def policy_evaluation(self, policy: Callable[[Any], Any]) -> np.ndarray:
-        R_prime = np.array([self.R(s, policy(s)) for s in self.S])
-        T_prime = np.array([[self.T(s, policy(s), s_prime) for s_prime in self.S] for s in self.S])
-        I = np.eye(len(self.S))
+        R_prime = np.array([self.rewards(s, policy(s)) for s in self.states])
+        T_prime = np.array([[self.t_matrix(s, policy(s), s_prime) for s_prime in self.states] for s in self.states])
+        I = np.eye(len(self.states))
         return np.linalg.solve(I - self.gamma * T_prime, R_prime)
 
     def greedy(self, U: Callable[[Any], float] | np.ndarray, s: Any) -> tuple[float, Any]:
-        expected_rewards = [self.lookahead(U, s, a) for a in self.A]
+        expected_rewards = [self.lookahead(U, s, a) for a in self.actions]
         idx = np.argmax(expected_rewards)
-        return self.A[idx], expected_rewards[idx]
+        return self.actions[idx], expected_rewards[idx]
 
     def backup(self, U: Callable[[Any], float] | np.ndarray, s: Any) -> float:
-        return np.max([self.lookahead(U, s, a) for a in self.A])
+        return np.max([self.lookahead(U, s, a) for a in self.actions])
 
     def randstep(self, s: Any, a: Any) -> tuple[Any, float]:
-        return self.TR(s, a)
+        return self.q_sample(s, a)
 
     def simulate(self, s: Any, policy: Callable[[Any], Any], d: int) -> list[tuple[Any, Any, float]]:  # TODO - Create test
         trajectory = []
         for _ in range(d):
             a = policy(s)
-            s_prime, r = self.TR(s, a)
+            s_prime, r = self.q_sample(s, a)
             trajectory.append((s, a, r))
             s = s_prime
         return trajectory
     
     def random_policy(self):
-        return lambda s, A=self.A: random.choices(A)[0]
+        return lambda s, A=self.actions: random.choices(A)[0]
 
 
 class ValueFunctionPolicy():
@@ -145,9 +146,9 @@ class PolicyIteration(ExactSolutionMethod):
         for _ in range(self.k_max):
             U = P.policy_evaluation(policy)
             policy_prime = ValueFunctionPolicy(P, U)
-            if all([policy(s) == policy_prime(s) for s in P.S]):
+            if all([policy(s) == policy_prime(s) for s in P.states]):
                 break
-            print([policy_prime(s) for s in P.S], f'{U = }')
+            print([policy_prime(s) for s in P.states], f'{U = }')
             policy = policy_prime
         return policy
 
@@ -165,9 +166,9 @@ class ValueIteration(ExactSolutionMethod):
         self.k_max = k_max
 
     def solve(self, P: MDP) -> Callable[[Any], Any]:
-        U = np.zeros(len(P.S))
+        U = np.zeros(len(P.states))
         for _ in range(self.k_max):
-            U = np.array([P.backup(U, s) for s in P.S])
+            U = np.array([P.backup(U, s) for s in P.states])
             print(U)
         return ValueFunctionPolicy(P, U)
 
@@ -189,9 +190,9 @@ class GaussSeidelValueIteration(ExactSolutionMethod):
         self.k_max = k_max
 
     def solve(self, P: MDP) -> Callable[[Any], Any]:
-        U = np.zeros(len(P.S))
+        U = np.zeros(len(P.states))
         for _ in range(self.k_max):
-            for i, s in enumerate(P.S):
+            for i, s in enumerate(P.states):
                 U[i] = P.backup(U, s)
         return ValueFunctionPolicy(P, U)
 
@@ -199,7 +200,7 @@ class GaussSeidelValueIteration(ExactSolutionMethod):
 class LinearProgramFormulation(ExactSolutionMethod):
 
 
-    
+
     def solve(self, P: MDP) -> Callable[[Any], Any]:
         S, A, R, T = self.numpyform(P)
         U = cp.Variable(len(S))
@@ -211,10 +212,10 @@ class LinearProgramFormulation(ExactSolutionMethod):
 
     @staticmethod
     def numpyform(P: MDP) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        S_prime = np.arange(len(P.S))
-        A_prime = np.arange(len(P.A))
-        R_prime = np.array([[P.R(s, a) for a in P.A] for s in P.S])
-        T_prime = np.array([[[P.T(s, a, s_prime) for s_prime in S_prime] for a in P.A] for s in P.S])
+        S_prime = np.arange(len(P.states))
+        A_prime = np.arange(len(P.actions))
+        R_prime = np.array([[P.rewards(s, a) for a in P.actions] for s in P.states])
+        T_prime = np.array([[[P.t_matrix(s, a, s_prime) for s_prime in S_prime] for a in P.actions] for s in P.states])
         return S_prime, A_prime, R_prime, T_prime
 
 
