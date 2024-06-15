@@ -27,7 +27,7 @@ class MDP():
     gamma: discount factor
     states: state space
     actions: action space
-    t_matrix: transition function
+    t_prob: transition function
     rewards: reward function
     r_sample: sample transition and reward. We will us `TR` later to sample the next
         state and reward given the current state and action: s_prime, r = TR(s, a)
@@ -37,8 +37,8 @@ class MDP():
                  gamma: float, 
                  states: list[Any],
                  actions: list[Any],
-                 t_matrix: Callable[[Any, Any, Any], float] | np.ndarray,
-                 rewards: Callable[[Any, Any], float] | np.ndarray,
+                 t_prob: Callable[[Any, Any, Any], float] | np.ndarray,
+                 rewards:  Callable[[Any, Any], float] | np.ndarray,
                  r_sample: Callable[[Any, Any], tuple[Any, float]] = None):
         self.gamma = gamma  # discount factor
         self.states = states          # state space
@@ -52,37 +52,37 @@ class MDP():
 
         # transition function T(s, a, s')
         # sample next state and reward given current state and action: s', r = TR(s, a)
-        if type(t_matrix) == np.ndarray:
-            self.t_matrix = lambda s, a, s_prime: t_matrix[s, a, s_prime]
-            self.q_sample = lambda s, a: (np.random.choice(len(self.states), p=t_matrix[s, a]), self.rewards(s, a)) if not np.all(t_matrix[s, a] == 0) else (np.random.choice(len(self.states)), self.rewards(s, a))
+        if type(t_prob) == np.ndarray:
+            self.t_prob = lambda s, a, s_prime: t_prob[s, a, s_prime]
+            self.q_sample = lambda s, a: (np.random.choice(len(self.states), p=t_prob[s, a]), self.rewards(s, a)) if not np.all(t_prob[s, a] == 0) else (np.random.choice(len(self.states)), self.rewards(s, a))
         else:
-            self.t_matrix = t_matrix
+            self.t_prob = t_prob
             self.q_sample = r_sample
 
-    def lookahead(self, U: Callable[[Any], float] | np.ndarray, s: Any, a: Any) -> float:
-        if callable(U):
-            return self.rewards(s, a) + self.gamma * np.sum([self.t_matrix(s, a, s_prime) * U(s_prime) for s_prime in self.states])
-        return self.rewards(s, a) + self.gamma * np.sum([self.t_matrix(s, a, s_prime) * U[i] for i, s_prime in enumerate(self.states)])
+    def lookahead(self, V: Callable[[Any], float] | np.ndarray, s: Any, a: Any) -> float:
+        if callable(V):
+            return self.rewards(s, a) + self.gamma * np.sum([self.t_prob(s, a, s_prime) * V(s_prime) for s_prime in self.states])
+        return self.rewards(s, a) + self.gamma * np.sum([self.t_prob(s, a, s_prime) * V[i] for i, s_prime in enumerate(self.states)])
 
     def iterative_policy_evaluation(self, policy: Callable[[Any], Any], k_max: int) -> np.ndarray:
-        U = np.zeros(len(self.states))
+        V = np.zeros(len(self.states)) # V is the expected utility of the policy \pi on the state S. also known as $V_{\pi}(s)$
         for _ in range(k_max):
-            U = np.array([self.lookahead(U, s, policy(s)) for s in self.states])
-        return U
+            V = np.array([self.lookahead(V, s, policy(s)) for s in self.states])
+        return V
 
     def policy_evaluation(self, policy: Callable[[Any], Any]) -> np.ndarray:
         R_prime = np.array([self.rewards(s, policy(s)) for s in self.states])
-        T_prime = np.array([[self.t_matrix(s, policy(s), s_prime) for s_prime in self.states] for s in self.states])
+        T_prime = np.array([[self.t_prob(s, policy(s), s_prime) for s_prime in self.states] for s in self.states])
         I = np.eye(len(self.states))
         return np.linalg.solve(I - self.gamma * T_prime, R_prime)
 
-    def greedy(self, U: Callable[[Any], float] | np.ndarray, s: Any) -> tuple[float, Any]:
-        expected_rewards = [self.lookahead(U, s, a) for a in self.actions]
+    def greedy(self, V: Callable[[Any], float] | np.ndarray, s: Any) -> tuple[float, Any]:
+        expected_rewards = [self.lookahead(V, s, a) for a in self.actions]
         idx = np.argmax(expected_rewards)
         return self.actions[idx], expected_rewards[idx]
 
-    def backup(self, U: Callable[[Any], float] | np.ndarray, s: Any) -> float:
-        return np.max([self.lookahead(U, s, a) for a in self.actions])
+    def backup(self, V: Callable[[Any], float] | np.ndarray, s: Any) -> float:
+        return np.max([self.lookahead(V, s, a) for a in self.actions])
 
     def randstep(self, s: Any, a: Any) -> tuple[Any, float]:
         return self.q_sample(s, a)
@@ -101,12 +101,12 @@ class MDP():
 
 
 class ValueFunctionPolicy():
-    def __init__(self, P: MDP, U: Callable[[Any], float] | np.ndarray):
-        self.P = P  # problem
-        self.U = U  # utility function
+    def __init__(self, problem: MDP, V: Callable[[Any], float] | np.ndarray):
+        self.problem = problem  # problem
+        self.V = V        # expected utility function (given a policy)
 
     def __call__(self, s: Any) -> Any:
-        return self.P.greedy(self.U, s)[0]
+        return self.problem.greedy(self.V, s)[0]
 
 
 class MDPSolutionMethod(ABC):
@@ -115,7 +115,7 @@ class MDPSolutionMethod(ABC):
 
 class OfflinePlanningMethod(MDPSolutionMethod):
     @abstractmethod
-    def solve(self, P: MDP) -> Callable[[Any], Any]:
+    def solve(self, problem: MDP) -> Callable[[Any], Any]:
         pass
 
 
@@ -141,14 +141,14 @@ class PolicyIteration(ExactSolutionMethod):
         self.initial_policy = initial_policy
         self.k_max = k_max
 
-    def solve(self, P: MDP) -> Callable[[Any], Any]:
+    def solve(self, problem: MDP) -> Callable[[Any], Any]:
         policy = self.initial_policy
         for _ in range(self.k_max):
-            U = P.policy_evaluation(policy)
-            policy_prime = ValueFunctionPolicy(P, U)
-            if all([policy(s) == policy_prime(s) for s in P.states]):
+            V = problem.policy_evaluation(policy)
+            policy_prime = ValueFunctionPolicy(problem, V)
+            if all([policy(s) == policy_prime(s) for s in problem.states]):
                 break
-            print([policy_prime(s) for s in P.states], f'{U = }')
+            print([policy_prime(s) for s in problem.states], f'{V = }')
             policy = policy_prime
         return policy
 
@@ -165,16 +165,17 @@ class ValueIteration(ExactSolutionMethod):
     def __init__(self, k_max: int):
         self.k_max = k_max
 
-    def solve(self, P: MDP) -> Callable[[Any], Any]:
-        U = np.zeros(len(P.states))
+    def solve(self, problem: MDP) -> Callable[[Any], Any]:
+        V = np.zeros(len(problem.states))
         for _ in range(self.k_max):
-            U = np.array([P.backup(U, s) for s in P.states])
-            print(U)
-        return ValueFunctionPolicy(P, U)
+            V = np.array([problem.backup(V, s) for s in problem.states])
+            print(V)
+        return ValueFunctionPolicy(problem, V)
 
 
 class GaussSeidelValueIteration(ExactSolutionMethod):
-    """    In asynchronous value iteration, only a subset of the states are updated with 
+    """    
+    In asynchronous value iteration, only a subset of the states are updated with 
     each iteration. Asynchronous value iteration is still guaranteed to converge on 
     the optimal value function, provided that each state is updated an infinite number of times.
     
@@ -189,33 +190,33 @@ class GaussSeidelValueIteration(ExactSolutionMethod):
     def __init__(self, k_max: int):
         self.k_max = k_max
 
-    def solve(self, P: MDP) -> Callable[[Any], Any]:
-        U = np.zeros(len(P.states))
+    def solve(self, problem: MDP) -> Callable[[Any], Any]:
+        V = np.zeros(len(problem.states))
         for _ in range(self.k_max):
-            for i, s in enumerate(P.states):
-                U[i] = P.backup(U, s)
-        return ValueFunctionPolicy(P, U)
+            for i, s in enumerate(problem.states):
+                V[i] = problem.backup(V, s)
+        return ValueFunctionPolicy(problem, V)
 
 
 class LinearProgramFormulation(ExactSolutionMethod):
 
 
 
-    def solve(self, P: MDP) -> Callable[[Any], Any]:
-        S, A, R, T = self.numpyform(P)
-        U = cp.Variable(len(S))
-        objective = cp.Minimize(cp.sum(U))
-        constraints = [U[s] >= R[s, a] + P.gamma * (T[s, a] @ U) for s in S for a in A]
+    def solve(self, problem: MDP) -> Callable[[Any], Any]:
+        S, A, R, T = self.numpyform(problem)
+        V = cp.Variable(len(S))
+        objective = cp.Minimize(cp.sum(V))
+        constraints = [V[s] >= R[s, a] + problem.gamma * (T[s, a] @ V) for s in S for a in A]
         problem = cp.Problem(objective, constraints)
         problem.solve()
-        return ValueFunctionPolicy(P, U.value)
+        return ValueFunctionPolicy(problem, V.value)
 
     @staticmethod
-    def numpyform(P: MDP) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        S_prime = np.arange(len(P.states))
-        A_prime = np.arange(len(P.actions))
-        R_prime = np.array([[P.rewards(s, a) for a in P.actions] for s in P.states])
-        T_prime = np.array([[[P.t_matrix(s, a, s_prime) for s_prime in S_prime] for a in P.actions] for s in P.states])
+    def numpyform(problem: MDP) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        S_prime = np.arange(len(problem.states))
+        A_prime = np.arange(len(problem.actions))
+        R_prime = np.array([[problem.rewards(s, a) for a in problem.actions] for s in problem.states])
+        T_prime = np.array([[[problem.t_prob(s, a, s_prime) for s_prime in S_prime] for a in problem.actions] for s in problem.states])
         return S_prime, A_prime, R_prime, T_prime
 
 
