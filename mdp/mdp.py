@@ -157,7 +157,7 @@ class ValueIteration(ExactSolutionMethod):
     """Bellman's algorithm
     Value iteration is an alternative to policy iteration that is often used 
     because of its simplicity. Unlike policy improvement, value iteration 
-    updates the value function directly. I
+    updates the value function directly. 
 
     Args:
         ExactSolutionMethod (_type_): _description_
