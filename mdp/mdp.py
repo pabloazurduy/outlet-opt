@@ -37,12 +37,12 @@ class MDP():
                  gamma: float, 
                  states: list[Any],
                  actions: list[Any],
-                 t_prob: Callable[[Any, Any, Any], float] | np.ndarray,
+                 t_prob:   Callable[[Any, Any, Any], float] | np.ndarray,
                  rewards:  Callable[[Any, Any], float] | np.ndarray,
                  r_sample: Callable[[Any, Any], tuple[Any, float]] = None):
-        self.gamma = gamma  # discount factor
-        self.states = states          # state space
-        self.actions = actions          # action space
+        self.gamma = gamma     # discount factor
+        self.states = states   # state space
+        self.actions = actions # action space
 
         # reward function R(s, a)
         if type(rewards) == np.ndarray:

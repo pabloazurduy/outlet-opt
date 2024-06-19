@@ -1,16 +1,23 @@
-from mdp import MDP
-from dataclasses import dataclass, fields
 from typing import List, Tuple, Protocol
+from enum import Enum
+from dataclasses import dataclass, fields
+import itertools as it 
+from collections import namedtuple
+
 import numpy as np
 from scipy.stats import poisson
 
-@dataclass
+from mdp import MDP
+
+
+@dataclass(repr=True)
 class Item: 
     id: int
     stock: int
     low_price_bound: float 
     high_price_bound: float
     days_to_dispose: int
+    tick_step:float
 
 @dataclass 
 class Outlet: 
@@ -31,12 +38,19 @@ class Outlet:
 
         return f"{header}\n{divider}\n{rows}"
 
+
+class MDPVersion(Enum):
+    INDIVIDUAL = 1
+    COMPLEX = 2
+    ADVANCED = 3
+
+
 @dataclass
-class SimOutlet(Protocol):
+class SimOutlet:
     outlet: Outlet
     
     @classmethod
-    def new_simulation(cls, n_items:int=10, days_avg:int=20, stock_avg:int=100, price_range:Tuple[float, float]=(5000, 80_000)):
+    def new_simulation(cls, n_items:int=10, days_avg:int=20, stock_avg:int=100, price_range:Tuple[float, float]=(5000, 80_000), tick_step:float=1000):
         
         items_list:List[Item] = []
         for id in range(n_items):
@@ -45,21 +59,30 @@ class SimOutlet(Protocol):
             days_to_dispose  = poisson.rvs(days_avg)
             low_price_bound  = int(np.random.uniform(low=price_range[0], high=price_range[1])// 1000) * 1000
             high_price_bound = int(low_price_bound*1.3//1000)*1000
+            tick_step = tick_step
             
-            item = Item(id=item_id, stock=stock, low_price_bound=low_price_bound, high_price_bound=high_price_bound, days_to_dispose=days_to_dispose)
+            item = Item(id=item_id, stock=stock, low_price_bound=low_price_bound, 
+                        high_price_bound=high_price_bound, 
+                        days_to_dispose=days_to_dispose,tick_step=tick_step)
             items_list.append(item)
         
         return cls(outlet=Outlet(items=items_list))
 
-    def as_mdp(self):
-        raise NotImplementedError
+    def to_mdp(self, mdp_type:MDPVersion = MDPVersion.INDIVIDUAL)-> List[MDP]:   
+        if mdp_type == MDPVersion.INDIVIDUAL:
+            State = namedtuple('State', ['price', 'stock', 'days'])
+            for item in self.outlet.items:
+                gamma = 0.8
+                price_arr = np.arange(item.low_price_bound, item.high_price_bound, item.tick_step)[::-1] 
+                stock_arr = np.arange(0,item.stock,1 )[::-1] 
+                days_arr = np.arange(0,item.days_to_dispose,1 )[::-1] 
+                states = [State(p,s,d) for (p,s,d) in it.product(price_arr,stock_arr,days_arr)]
+                actions =     
+
+        mdp_models = MDP()
+        return mdp_model 
     
-
-@dataclass
-class SimOutletSimple(SimOutlet):
-    outlet: Outlet
-
-
 if __name__ == "__main__":
-    sim = SimOutletSimple.new_simulation(n_items=10, days_avg=30, stock_avg=30)
+    sim = SimOutlet.new_simulation(n_items=10, days_avg=30, stock_avg=30)
+    mpds = sim.to_mdp(mdp_type=MDPVersion.INDIVIDUAL)
     print(sim.outlet)
