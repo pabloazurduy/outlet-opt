@@ -13,7 +13,7 @@ import random
 import warnings
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from typing import Any, Callable, List
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -26,7 +26,7 @@ class MDP():
 
     gamma: discount factor
     states: state space
-    actions: action space
+    actions_space: action space
     t_prob: transition function
     rewards: reward function
     r_sample: sample transition and reward. We will us `TR` later to sample the next
@@ -36,13 +36,21 @@ class MDP():
     def __init__(self,
                  gamma: float, 
                  states: list[Any],
-                 actions: list[Any],
                  t_prob:   Callable[[Any, Any, Any], float] | np.ndarray,
                  rewards:  Callable[[Any, Any], float] | np.ndarray,
+                 actions_space: list[Any] = None,
+                 actions:  Callable[[Any], List[Any]] = None,
                  r_sample: Callable[[Any, Any], tuple[Any, float]] = None):
         self.gamma = gamma     # discount factor
         self.states = states   # state space
-        self.actions = actions # action space
+        
+        if actions and actions_space is None:
+            self.actions_space = list(set([action for s in states for action in actions(s)]))
+        elif actions_space and actions is None:
+            self.actions = lambda s: actions_space
+        else:
+            raise ValueError('Only one of actions or actions_space can be defined')
+        
 
         # reward function R(s, a)
         if type(rewards) == np.ndarray:
@@ -77,12 +85,12 @@ class MDP():
         return np.linalg.solve(I - self.gamma * T_prime, R_prime)
 
     def greedy(self, V: Callable[[Any], float] | np.ndarray, s: Any) -> tuple[float, Any]:
-        expected_rewards = [self.lookahead(V, s, a) for a in self.actions]
+        expected_rewards = [self.lookahead(V, s, a) for a in self.actions(s)]
         idx = np.argmax(expected_rewards)
-        return self.actions[idx], expected_rewards[idx]
+        return self.actions(s)[idx], expected_rewards[idx]
 
     def backup(self, V: Callable[[Any], float] | np.ndarray, s: Any) -> float:
-        return np.max([self.lookahead(V, s, a) for a in self.actions])
+        return np.max([self.lookahead(V, s, a) for a in self.actions(s)])
 
     def randstep(self, s: Any, a: Any) -> tuple[Any, float]:
         return self.q_sample(s, a)
@@ -97,7 +105,7 @@ class MDP():
         return trajectory
     
     def random_policy(self):
-        return lambda s, A=self.actions: random.choices(A)[0]
+        return lambda s: random.choices(self.actions(s))[0]
 
 
 class ValueFunctionPolicy():
@@ -214,9 +222,9 @@ class LinearProgramFormulation(ExactSolutionMethod):
     @staticmethod
     def numpyform(problem: MDP) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         S_prime = np.arange(len(problem.states))
-        A_prime = np.arange(len(problem.actions))
-        R_prime = np.array([[problem.rewards(s, a) for a in problem.actions] for s in problem.states])
-        T_prime = np.array([[[problem.t_prob(s, a, s_prime) for s_prime in S_prime] for a in problem.actions] for s in problem.states])
+        A_prime = np.arange(len(problem.actions_space))
+        R_prime = np.array([[problem.rewards(s, a) for a in problem.actions_space] for s in problem.states])
+        T_prime = np.array([[[problem.t_prob(s, a, s_prime) for s_prime in S_prime] for a in problem.actions_space] for s in problem.states])
         return S_prime, A_prime, R_prime, T_prime
 
 
