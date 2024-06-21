@@ -1,4 +1,4 @@
-from typing import List, Tuple, Protocol, Self, Any, Dict
+from typing import List, Tuple, Protocol, Self, Any, Dict, Union
 from enum import Enum
 from dataclasses import dataclass, fields
 import itertools as it 
@@ -21,8 +21,22 @@ class Item:
     tick_step:float
 
 @dataclass 
+class SimItem(Item):
+    elasticity_beta:float
+    weekend_beta:float
+    bias_beta:float
+
+    def conv_prob(self, dow:int, price:float) -> float:
+        return expit(self.bias_beta + 
+                     self.weekend_beta*(((dow % 7) == 6) + ((dow % 7) == 0)) + 
+                     self.elasticity_beta*price/self.high_price_bound )
+    
+    def state_prob(self, s:'State', s_p:'State', a:Any)-> float:
+        pass
+
+@dataclass 
 class Outlet: 
-    items: List[Item]
+    items: List[Item|SimItem]
 
     def __repr__(self):
         if not self.items:
@@ -46,20 +60,6 @@ class MDPVersion(Enum):
     COMPLEX = 2
     ADVANCED = 3
 
-@dataclass 
-class SimItem(Item):
-    elasticity_beta:float
-    weekend_beta:float
-    bias_beta:float
-
-    def conv_prob(self, dow:int, price:float) -> float:
-        return expit(self.bias_beta + 
-                     self.weekend_beta*(((dow % 7) == 6) + ((dow % 7) == 0)) + 
-                     self.elasticity_beta*price/self.high_price_bound )
-    
-    def state_prob(self, s:"State", s_p:"State", a:Any)-> float:
-        pass
-
 @dataclass
 class SimOutlet:
     sim_outlet: List[SimItem]
@@ -76,20 +76,20 @@ class SimOutlet:
             low_price_bound  = int(np.random.uniform(low=price_range[0], high=price_range[1])// 1000) * 1000
             high_price_bound = int(low_price_bound*1.3//1000)*1000
             tick_step = tick_step
+
             
-            item = Item(id=item_id, 
-                        stock=stock, 
-                        low_price_bound=low_price_bound, 
-                        high_price_bound=high_price_bound, 
-                        days_to_dispose=days_to_dispose,
-                        tick_step=tick_step)
-            
-            SimItem(item = item, 
-                    elasticity_beta=np.random.uniform(low=-1, high=-0.2),
-                    weekend_beta = np.random.uniform(low=0.5, high=1.5)
+            item = SimItem(id=item_id, 
+                           stock=stock, 
+                           low_price_bound=low_price_bound, 
+                           high_price_bound=high_price_bound, 
+                           days_to_dispose=days_to_dispose,
+                           tick_step=tick_step,
+                           elasticity_beta=np.random.uniform(low=-1, high=-0.2),
+                           weekend_beta = np.random.uniform(low=0.5, high=1.5),
+                           bias_beta=np.random.uniform(low=-3, high=-2),
                     )
-        
-        return cls(outlet=Outlet(items=items_list))
+            items_list.append(item)
+        return cls(sim_outlet=Outlet(items=items_list))
 
     def to_mdp(self, mdp_type:MDPVersion = MDPVersion.INDIVIDUAL)-> List[MDP]:   
         if mdp_type == MDPVersion.INDIVIDUAL:
