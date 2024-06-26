@@ -57,7 +57,7 @@ class MDP():
         # transition function T(s, a, s')
         # sample next state and reward given current state and action: s', r = TR(s, a)
         if type(t_prob) == np.ndarray:
-            self.t_prob = lambda s, a, s_prime: t_prob[s, a, s_prime]
+            self.t_prob   = lambda s, a, s_prime: t_prob[s, a, s_prime]
             self.q_sample = lambda s, a: (np.random.choice(len(self.states), p=t_prob[s, a]), self.rewards(s, a)) if not np.all(t_prob[s, a] == 0) else (np.random.choice(len(self.states)), self.rewards(s, a))
         else:
             self.t_prob = t_prob
@@ -101,10 +101,12 @@ class MDP():
         return trajectory
     
     def random_policy(self):
-        return lambda s: random.choices(self.actions(s))[0]
+        return lambda s, actions=self.actions: random.choices(actions(s))[0]
 
 
 class ValueFunctionPolicy():
+    """gets the policy given a value function
+    """
     def __init__(self, problem: MDP, V: Callable[[Any], float] | np.ndarray):
         self.problem = problem  # problem
         self.V = V        # expected utility function (given a policy)
