@@ -44,12 +44,8 @@ class MDP():
         self.gamma = gamma     # discount factor
         self.states = states   # state space
         
-        if actions and actions_space is None:
-            self.actions_space = list(set([action for s in states for action in actions(s)]))
-        elif actions_space and actions is None:
-            self.actions = lambda s: actions_space
-        else:
-            raise ValueError('Only one of actions or actions_space can be defined')
+        self.actions = actions if actions is not None else lambda s: actions_space 
+        self.actions_space = actions_space if actions_space is not None else list(set([action for s in states for action in actions(s)]))
         
 
         # reward function R(s, a)
