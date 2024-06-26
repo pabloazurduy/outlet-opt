@@ -1,5 +1,5 @@
 # Outlet-Opt
-a set of algorithms to optimize outlet sales. This code is based on ["algorithms for decision making"](https://algorithmsbook.com/), and also uses the code translations for python from https://github.com/griffinbholt/decisionmaking-code-py/
+A set of algorithms to optimize outlet sales. This code is based on ["algorithms for decision making"](https://algorithmsbook.com/), and uses the code transpile from https://github.com/griffinbholt/decisionmaking-code-py/
 used under fair use 
 
 ## Overview
