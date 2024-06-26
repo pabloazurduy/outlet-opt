@@ -1,9 +1,28 @@
-# outlet-opt
+# Outlet-Opt
 a set of algorithms to optimize outlet sales. This code is based on ["algorithms for decision making"](https://algorithmsbook.com/), and also uses the code translations for python from https://github.com/griffinbholt/decisionmaking-code-py/
 used under fair use 
 
 ## Overview
 The aim of this repository is to solve the problem of optimum price policy for a set of items that must be sold on a determinate amount of days. The data is generated based on a `SimOutlet` class that is very straightforward to use.
+
+```python
+@dataclass(repr=True, frozen=True)
+class Item: 
+    id: int
+    stock: int
+    low_price_bound: float 
+    high_price_bound: float
+    days_to_dispose: int
+    tick_step:float
+
+@dataclass(frozen=True)
+class SimItem(Item):
+    # a simulated version of an item, it has some simulated parameters useful to understand some purchase probabilities 
+    elasticity_beta:float
+    weekend_beta:float
+    bias_beta:float
+    purchase_prob_cap:float
+```
 
 The module `outlet` contains the classes for the outlet MDP definition.
 The module `mdp` contains the classes that define an MDP and a few optimization algorithms.
