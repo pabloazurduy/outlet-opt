@@ -1,5 +1,5 @@
 # Outlet-Opt
-A set of algorithms to optimize outlet sales. This code is based on ["algorithms for decision making"](https://algorithmsbook.com/), and uses the code transpile from https://github.com/griffinbholt/decisionmaking-code-py/
+A set of algorithms to optimize outlet sales. This code is based on ["Algorithms For Decision Making"](https://algorithmsbook.com/), and uses the code transpile from https://github.com/griffinbholt/decisionmaking-code-py/
 used under fair use 
 
 ## Overview
@@ -30,6 +30,21 @@ The module `mdp` contains the classes that define an MDP and a few optimization 
 In this first version, we assume that the outlet problem is known - we know the transition probabilities -. However, we could extend this problem to non-MDP setups, such as SARSA or other RL algorithms; that's future work.
 
 ## Getting Started
+
+### Outlet Model 
+model diagram
+
+```mermaid
+graph LR
+S0["S(units(u),price(p),time(t))"] --> A{A=Price}
+A -->S1["S(u,p=a1,t+1)"]
+A -->S2["S(u,p=a2,t+1)"]
+A -->S3["S(u,p=a3,t+1)"]
+A -->S4["S(...)"]
+A -->S5["S(u-1,p=1,t+1)"]
+A -->S6["S(...)"]
+
+```
 
 ### Prerequisites
 

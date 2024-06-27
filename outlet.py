@@ -104,7 +104,8 @@ class SimOutlet:
     
     @classmethod
     def new_simulation(cls, n_items:int=10, days_avg:int=10, stock_avg:int=30, price_range:Tuple[float, float]=(5000, 80_000), 
-                       tick_step:float=5000, purchase_prob_cap_bounds:Tuple[float,float] = (0.15,0.3), daily_cost:float=2000) -> Self:
+                       tick_step:float=5000, purchase_prob_cap_bounds:Tuple[float,float] = (0.15,0.3), daily_cost:float=2000,
+                       price_reduction_margin:float = 0.3) -> Self:
         
         items_list:List[SimItem] = []
         for id in range(n_items):
@@ -112,7 +113,7 @@ class SimOutlet:
             stock = max(poisson.rvs(stock_avg),1)
             days_to_dispose  = poisson.rvs(days_avg)
             low_price_bound  = int(np.random.uniform(low=price_range[0], high=price_range[1])// 1000) * 1000
-            high_price_bound = int(low_price_bound*1.3//1000)*1000
+            high_price_bound = int(low_price_bound*(1+price_reduction_margin)//1000)*1000
             tick_step = tick_step
 
             
@@ -153,8 +154,11 @@ class SimOutlet:
 
 if __name__ == "__main__":
 
-    sim = SimOutlet.new_simulation(n_items=10, days_avg=20, stock_avg=2, purchase_prob_cap_bounds=(0.15,0.2), 
-                                   daily_cost=2000, price_range=(5000, 80_000), tick_step=2000)
+    sim = SimOutlet.new_simulation(n_items=10, days_avg=20, stock_avg=2, 
+                                   purchase_prob_cap_bounds=(0.15,0.40), 
+                                   daily_cost=2000, price_range=(40_000, 70_000), tick_step=2500,
+                                   price_reduction_margin=0.6
+                                   )
     mdps = sim.to_mdp(mdp_type=MDPVersion.INDIVIDUAL)
     pvals:List[float] = []
     opt_vals:List[float] = []
