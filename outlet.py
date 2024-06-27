@@ -21,6 +21,7 @@ class Item:
     high_price_bound: float
     days_to_dispose: int
     tick_step:float
+    daily_cost:float
 
 @dataclass(frozen=True)
 class SimItem(Item):
@@ -56,15 +57,15 @@ class SimItem(Item):
             float: _description_
         """
         
-        if (s_p.price != a or  # price is equal to the one defined
+        if (s_p.price != a or  # price of next state is not equal to the one defined
             s_p.days != s.days-1 or # not next day
-            s_p.stock> s.stock or # not reduced inventory
+            s_p.stock> s.stock or # increase inventory
             s.price < a # we can't increase price
             ):
             return 0   
-        if s.stock-s_p.stock>0:
+        if s.stock-s_p.stock>0: # if we have sales
             t_prob =  self.sale_prob(dow=s_p.days, price=a, units=s.stock-s_p.stock)
-        else:
+        else: # if we don't have sales 
             t_prob = 1-sum([self.sale_prob(dow=s_p.days, price=a, units=s.stock-i) for i in range(s.stock)])
         print(f'fval for {s,a,s_p}: {t_prob:.5f}')
         return t_prob
@@ -103,7 +104,7 @@ class SimOutlet:
     
     @classmethod
     def new_simulation(cls, n_items:int=10, days_avg:int=10, stock_avg:int=30, price_range:Tuple[float, float]=(5000, 80_000), 
-                       tick_step:float=5000, purchase_prob_cap_bounds:Tuple[float,float] = (0.15,0.3)) -> Self:
+                       tick_step:float=5000, purchase_prob_cap_bounds:Tuple[float,float] = (0.15,0.3), daily_cost:float=2000) -> Self:
         
         items_list:List[SimItem] = []
         for id in range(n_items):
@@ -121,6 +122,7 @@ class SimOutlet:
                            high_price_bound=high_price_bound, 
                            days_to_dispose=days_to_dispose,
                            tick_step=tick_step,
+                           daily_cost=daily_cost,
                            elasticity_beta=np.random.uniform(low=-1, high=-0.2),
                            weekend_beta = np.random.uniform(low=0.5, high=1.5),
                            bias_beta=np.random.uniform(low=-3, high=-2),
@@ -134,36 +136,25 @@ class SimOutlet:
             State = namedtuple('State', ['price', 'stock', 'days'])                
             models:List[MDP]=[]
             for item in self.sim_outlet.items:
-                gamma = 0.8
+                gamma = 0.85
                 price_arr = np.arange(item.low_price_bound, item.high_price_bound, item.tick_step)[::-1] 
                 stock_arr = np.arange(0,item.stock,1 )[::-1] 
                 days_arr = np.arange(0,item.days_to_dispose,1 )[::-1] 
                 states = [State(p,s,d) for (p,s,d) in it.product(price_arr,stock_arr,days_arr)]
                 actions = lambda s, price_arr=price_arr: list(filter(lambda p: p <= s.price, price_arr))
                 t_prob =  lambda s, a, sp: item.individual_t_prob(s,a, sp)
-                rewards = lambda s, a, states=states: sum([a * (s.stock - sp.stock)*t_prob(s ,a,sp) for sp in states if sp.price==a and sp.stock <= s.stock]) 
+                rewards = lambda s, a, states=states: sum([a * (s.stock - sp.stock)*t_prob(s ,a, sp) -item.daily_cost for sp in states 
+                                                           if sp.price==a and sp.stock <= s.stock and sp.days==s.days-1]) 
                 mdp = MDP(gamma=gamma, states=states, actions=actions, t_prob=t_prob, rewards=rewards)
                 models.append(mdp)
 
         return models 
 
 
-def process_item_mdp(item_mdp):
-    actions = item_mdp.actions_space
-    pval = item_mdp.policy_evaluation(policy=lambda x: min(actions))
-    
-    pi = PolicyIteration(k_max=100, initial_policy=item_mdp.random_policy())
-    opt_policy = pi.solve(problem=item_mdp)
-    opt_pval = item_mdp.policy_evaluation(policy=opt_policy)
-    
-    rewards_gap = (opt_pval[0] - pval[0]) / pval[0]
-    return pval[0], opt_pval[0], rewards_gap
-
-
-
 if __name__ == "__main__":
 
-    sim = SimOutlet.new_simulation(n_items=15, days_avg=20, stock_avg=3, purchase_prob_cap_bounds=(0.15,0.2))
+    sim = SimOutlet.new_simulation(n_items=10, days_avg=20, stock_avg=2, purchase_prob_cap_bounds=(0.15,0.2), 
+                                   daily_cost=2000, price_range=(5000, 80_000), tick_step=2000)
     mdps = sim.to_mdp(mdp_type=MDPVersion.INDIVIDUAL)
     pvals:List[float] = []
     opt_vals:List[float] = []
@@ -173,20 +164,18 @@ if __name__ == "__main__":
     for item_mdp in mdps:
         actions = item_mdp.actions_space
         pval = item_mdp.policy_evaluation(policy=lambda x:min(actions))
-        
-        #ipval = item_mdp.iterative_policy_evaluation(policy=lambda x:min(actions), k_max=100)
         print(f'dumb policy value {pval[0]}')
-        #print(f'dumb policy value {ipval[0]}')
+
         pi = PolicyIteration(k_max=100, initial_policy=item_mdp.random_policy())
         opt_policy = pi.solve(problem=item_mdp)
         print([opt_policy(s) for s in item_mdp.states])
         # opt_pval = mdp.iterative_policy_evaluation(policy=lambda x:opt_policy, k_max=100)
         opt_pval = item_mdp.policy_evaluation(policy=opt_policy)
         print(f'opt policy value {opt_pval[0]}')
-        rewards_gap = (opt_pval[0]-pval[0])/pval[0]
+        rewards_gap = (opt_pval[0]-pval[0])/abs(pval[0])
         pvals.append(pval[0])
         opt_vals.append(opt_pval[0])
         gaps.append(rewards_gap)
         print(f'gap val {rewards_gap:+.2%}')
 
-    print(rewards_gap)
+    print(f'Expected lift {np.nanmean(gaps):+.2%}')

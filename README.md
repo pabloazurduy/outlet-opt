@@ -95,3 +95,5 @@ for item_mdp in mdps:
     print(rewards_gap)
 ```
 
+> 0.08359726727985081
+
