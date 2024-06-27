@@ -45,6 +45,7 @@ A -->S5["S(u-1,p=1,t+1)"]
 A -->S6["S(...)"]
 
 ```
+The Outlet Model (MDP) starts with a state defining units, price, and time, then moves to a decision node where the optimal price is determined. From there, it transitions to various states representing different outcomes based on the chosen price, including potential adjustments in units and time. The model ends with states indicating the conclusion of the sales process, capturing the dynamic interplay between pricing decisions and sales outcomes.
 
 ### Prerequisites
 
