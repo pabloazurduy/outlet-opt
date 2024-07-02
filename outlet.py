@@ -156,8 +156,8 @@ if __name__ == "__main__":
 
     sim = SimOutlet.new_simulation(n_items=10, days_avg=20, stock_avg=2, 
                                    purchase_prob_cap_bounds=(0.15,0.40), 
-                                   daily_cost=2000, price_range=(40_000, 70_000), tick_step=2500,
-                                   price_reduction_margin=0.6
+                                   daily_cost=2000, price_range=(40_000, 70_000), tick_step=5000,
+                                   price_reduction_margin=0.5
                                    )
     mdps = sim.to_mdp(mdp_type=MDPVersion.INDIVIDUAL)
     pvals:List[float] = []
